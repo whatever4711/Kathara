@@ -3,18 +3,17 @@ try:
 except:
     import ConfigParser
 config = ConfigParser.ConfigParser()
-from io import StringIO
-from itertools import chain
+import ipaddress
+import mmap
+import os
 import re
 import sys
-from sys import platform as _platform
-import os
-import utils as u
-import depgen as dpg
 from collections import OrderedDict
-import random
-import ipaddress
+from io import StringIO
+from sys import platform as _platform
 
+import depgen as dpg
+import utils as u
 
 DEBUG = True
 PRINT = False
@@ -34,14 +33,17 @@ if _platform == MAC_OS:
 elif _platform == WINDOWS:
     PLATFORM = WINDOWS
 
+
 def read_config():
     tmp_config = ConfigParser.ConfigParser()
-    ini = u'[dummysection]\n' + open(os.path.join(os.environ['NETKIT_HOME'], '..', 'config'), 'r').read()
+
+    with open(os.path.join(os.environ['NETKIT_HOME'], '..', 'config'), 'r') as config_file:
+        ini = u'[dummysection]\n' + config_file.read()
+
     ini_string = StringIO(ini)
     tmp_config.readfp(ini_string)
-    conf = {}
-    for key, value in tmp_config.items('dummysection'): 
-        conf[key] = value
+    conf = dict(tmp_config.items('dummysection'))   # Convert the tuple array into a dict
+
     return conf
 
 kat_config = read_config()
@@ -70,17 +72,18 @@ def dep_sort(item, dependency_list):
     except:
         return 0
 
+
 def reorder_by_lab_dep(path, machines):
     if not os.path.exists(os.path.join(path, 'lab.dep')): 
         return machines
     # getting dependencies inside a data structure
     dependencies = {}
-    conf = open(os.path.join(path, 'lab.dep'), 'r')
-    for line in conf:
-        if line.strip() and line.strip() not in ['\n', '\r\n']:
-            app = line.split(":")
-            app[1] = re.sub('\s+', ' ', app[1]).strip()
-            dependencies[app[0].strip()] = app[1].split(' ') # dependencies[machine3] = [machine1, machine2]
+    with open(os.path.join(path, 'lab.dep'), 'r') as conf:
+        for line in conf:
+            if line.strip() and line.strip() not in ['\n', '\r\n']:
+                app = line.split(":")
+                app[1] = re.sub('\s+', ' ', app[1]).strip()
+                dependencies[app[0].strip()] = app[1].split(' ')    # dependencies[machine3] = [machine1, machine2]
 
     # building dependency set
     if dpg.has_loop(dependencies):
@@ -92,72 +95,78 @@ def reorder_by_lab_dep(path, machines):
     ordered_machines = OrderedDict(sorted(machines.items(), key=lambda t: dep_sort(t[0], dependency_list)))
     return ordered_machines
 
+
 def lab_parse(path, force=False):
     if (not force) and (not os.path.exists(os.path.join(path, 'lab.conf'))):
-        sys.stderr.write("No lab.conf in given directory\n" + path)
+        sys.stderr.write("No lab.conf in given directory: %s\n" % path)
         sys.exit(1)
 
     if force and (not os.path.exists(os.path.join(path, 'lab.conf'))):
-        return ({}, [], {}, {}) # has to get names from last positional args
+        return {}, [], {}, {}   # has to get names from last positional args
 
-    # reads lab.conf
-    ini_str = u'[dummysection]\n' + open(os.path.join(path, 'lab.conf'), 'r').read()
-    ini_fp = StringIO(ini_str)
-    config.readfp(ini_fp)
+    # Reads lab.conf in memory so it is faster.
+    with open(os.path.join(path, 'lab.conf'), 'r') as lab_file:
+        lab_mem_file = mmap.mmap(lab_file.fileno(), 0, prot=mmap.PROT_READ)
 
-    # gets 2 list of keys, one for machines and the other for the metadata
-    # we also need a unique list of links
-    keys = []
-    m_keys = []
-    links = []
-    for key, value in config.items('dummysection'): 
-        if DEBUG: sys.stderr.write(key, value)
-        if '[' in key and ']' in key:
-            splitted = key.split('[')[1].split(']')
+    machines = {}               # We get a dictionary of machines ignoring interfaces that have missing positions
+                                # (eg: 1,3,6 instead of 0,1,2)
+    links = set()               # We only need unique links
+    options = {}                # Machine options
+
+    line = lab_mem_file.readline()
+    while line:
+        if DEBUG:
+            sys.stderr.write(line + "\n")
+
+        matches = re.search(r"^(?P<key>[a-zA-Z0-9_]+)\[(?P<arg>\w+)\]=(?P<value>\"\w+\"|\'\w+\'|\w+)$",
+                            line.strip()
+                            )
+
+        if matches:
+            key = unicode(matches.group("key").strip(), "utf-8")
+            arg = unicode(matches.group("arg").strip(), "utf-8")
+            value = unicode(matches.group("value").replace('"', '').replace("'", ''), "utf-8")
+
             try:
-                _ = int(splitted[0])
-                links.append(value.strip().replace('"','').replace("'",''))
+                # It's an interface, handle it.
+                interface_number = int(arg)
+
+                links.add(value)
+
+                if not machines.get(key):
+                    machines[key] = []
+
+                # Append everything, the interface number check will be done later.
+                machines[key].append((value, interface_number))
             except ValueError:
-                pass
-            keys.append(key.strip())
-        else:
-            m_keys.append(key.strip())
+                # Not an interface, add it to the machine options.
+                if not options.get(key):
+                    options[key] = []
 
-    # we only need unique links
-    links = set(links)
-    # sort the keys so that we keep the order of the interfaces
-    keys.sort(key=u.natural_keys)
+                options[key].append((arg, value))
 
-    # we then get a dictionary of machines ignoring interfaces that have missing positions (eg: 1,3,6 instead of 0,1,2)
-    machines = {}
-    options = {}
-    for key in keys: 
-        splitted = key.split('[')
-        name = splitted[0].strip()
-        splitted = splitted[1].split(']')
-        try:
-            ifnumber = int(splitted[0].strip())
-            if not machines.get(name):
-                machines[name] = []
-            if len(machines[name]) == 0 or machines[name][len(machines[name])-1][1] == ifnumber - 1:
-                machines[name].append((config.get('dummysection', key).strip().replace('"','').replace("'",''), ifnumber))
-        except ValueError:
-            option = splitted[0].strip()
-            if not options.get(name):
-                options[name] = []
-            options[name].append((option, config.get('dummysection', key).strip().replace('"','').replace("'",'')))
-    # same with metadata
-    metadata = {}
-    for m_key in m_keys:
-        app = config.get('dummysection', m_key)
-        if app.startswith('"') and app.endswith('"'):
-            app = app[1:-1]
-        metadata[m_key] = app
-    
+        line = lab_mem_file.readline()
+
+    # Here we ignore interfaces that have missing positions (eg: 1,3,6 instead of 0,1,2)
+    for machine_name in machines:
+        # Sort the array before doing interface check.
+        machines[machine_name].sort(key=lambda x: x[1])
+        current_machine = machines[machine_name]
+
+        for i in range(1, len(current_machine)):
+            if current_machine[i - 1][1] != current_machine[i][1] - 1:
+                # If a number is non sequential, the rest of the list is garbage.
+                # Throw it away.
+                machines[machine_name] = current_machine[:i]
+                break
+
     machines = reorder_by_lab_dep(path, machines)
     
-    if DEBUG: print (machines, options, metadata)
-    return machines, links, options, metadata
+    if DEBUG:
+        print (machines, options, {})
+
+    return machines, links, options, {}
+
 
 #parsing external.conf file
 def external_parse(path):

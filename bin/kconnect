@@ -1,0 +1,4 @@
+#!/bin/bash
+
+`python $NETKIT_HOME/python/kconnect.py "$PWD/" "$@"`
+
