@@ -63,7 +63,7 @@ def build_k8s_definition_for_link(link_name, namespace, network_counter):
         "spec": {
             "config": """{
                         "cniVersion": "0.3.0",
-                        "type": "kathara",
+                        "type": "megalos",
                         "suffix": "%s",
                         "vlanId": %d
                     }""" % (namespace, 10 + network_counter)
