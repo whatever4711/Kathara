@@ -4,6 +4,7 @@ from .. import utils
 from ..foundation.command.Command import Command
 from ..manager.ManagerProxy import ManagerProxy
 from ..strings import strings, wiki_description
+from ..trdparty.libtmux.tmux import TMUX
 
 
 class LcleanCommand(Command):
@@ -51,3 +52,5 @@ class LcleanCommand(Command):
         ManagerProxy.get_instance().undeploy_lab(lab_hash,
                                                  selected_machines=args.machine_names
                                                  )
+
+        TMUX.get_instance().kill_instance()
