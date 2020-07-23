@@ -247,6 +247,7 @@ class Machine(object):
         CPU limit, defined as nano CPUs (10*e-9).
         User should pass a float value ranging from 0 to max user CPUs.
         It is took from options, or machine meta.
+        :return:
         """
         if "cpus" in self.lab.general_options:
             try:
