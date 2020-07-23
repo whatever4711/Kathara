@@ -11,7 +11,6 @@ class TMUX(object):
     def get_instance():
         if TMUX.__instance is None:
             TMUX()
-
         return TMUX.__instance
 
     def __init__(self):
@@ -31,14 +30,14 @@ class TMUX(object):
     def start(self, window_name, start_machine):
         while TMUX.__session is None:
             time.sleep(1)
-        logging.debug("windows: %s" % TMUX.__session.list_windows())
         window = TMUX.__session.find_where({"window_name": window_name})
         if not window:
-            logging.debug("Starting %s" % start_machine)
+            logging.debug("Starting tmux window for %s" % window_name)
             window = TMUX.__session.new_window(window_name=window_name, window_shell=start_machine)
 
     @staticmethod
     def kill_instance():
-        TMUX.__session.kill_session()
-        TMUX.__session = None
+        if TMUX.__session:
+            TMUX.__session.kill_session()
+            TMUX.__session = None
         TMUX.__instance = None

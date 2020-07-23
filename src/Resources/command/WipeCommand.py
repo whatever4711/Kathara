@@ -70,7 +70,6 @@ class WipeCommand(Command):
             sys.exit(0)
         else:
             ManagerProxy.get_instance().wipe(all_users=bool(args.all))
-            TMUX.get_instance().kill_instance()
 
         vlab_dir = utils.get_vlab_temp_path(force_creation=False)
         shutil.rmtree(vlab_dir, ignore_errors=True)
