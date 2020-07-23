@@ -17,10 +17,20 @@ class DockerImage(object):
 
     def pull(self, image_name):
         print("Pulling image `%s`... This may take a while." % image_name)
-        return self.client.images.pull(image_name, tag="latest")
+        tag = 'latest'
+        img_name = image_name
+        if ':' in image_name:
+            split_name = image_name.split(':')
+            img_name, tag = split_name[0], split_name[1]
+        return self.client.images.pull(img_name, tag=tag)
 
     def check_update(self, image_name):
         logging.debug("Check update for %s" % image_name)
+
+        if '/' not in image_name:
+            logging.debug('Cannot check image digest because %s is a library/<image>' % image_name)
+            return
+
         local_image_info = self.check_local(image_name)
 
         # Image has been built locally, so there's nothing to compare.
