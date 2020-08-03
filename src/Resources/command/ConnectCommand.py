@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from .. import utils
 from ..foundation.command.Command import Command
@@ -11,7 +12,7 @@ class ConnectCommand(Command):
 
     def __init__(self):
         Command.__init__(self)
-        
+
         parser = argparse.ArgumentParser(
             prog='kathara connect',
             description=strings['connect'],
