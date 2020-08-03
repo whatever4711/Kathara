@@ -49,7 +49,7 @@ class DockerImage(object):
 
         # Format is image_name@sha256, so we strip the first part.
         (_, local_image_digest) = local_repo_digest.split("@")
-
+        # TODO: Add a setting to pull images by default
         if remote_image_digest != local_image_digest:
             utils.confirmation_prompt("A new version of image `%s` has been found on Docker Hub. "
                                       "Do you want to pull it?" % image_name,
