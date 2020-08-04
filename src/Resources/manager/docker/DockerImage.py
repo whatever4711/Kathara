@@ -1,7 +1,6 @@
 import logging
 from docker.errors import APIError
 
-from ...api.DockerHubApi import DockerHubApi
 from ... import utils
 from ...exceptions import HTTPConnectionError
 
@@ -14,6 +13,9 @@ class DockerImage(object):
 
     def check_local(self, image_name):
         return self.client.images.get(image_name)
+
+    def check_remote(self, image_name):
+        return self.client.images.get_registry_data(image_name)
 
     def pull(self, image_name):
         print("Pulling image `%s`... This may take a while." % image_name)
@@ -39,17 +41,12 @@ class DockerImage(object):
             logging.debug("Image %s is build locally" % image_name)
             return
 
-        try:
-            remote_image_info = self.check_remote(image_name)
-            local_repo_digest = local_repo_digests[0]
-            remote_image_digest = remote_image_info["images"][0]["digest"]
-        except HTTPConnectionError:
-            logging.debug("Unable to connect to DockerHub")
-            return
+        remote_image_info = self.check_remote(image_name).attrs['Descriptor']
+        local_repo_digest = local_repo_digests[0]
+        remote_image_digest = remote_image_info["digest"]
 
         # Format is image_name@sha256, so we strip the first part.
         (_, local_image_digest) = local_repo_digest.split("@")
-
         if remote_image_digest != local_image_digest:
             utils.confirmation_prompt("A new version of image `%s` has been found on Docker Hub. "
                                       "Do you want to pull it?" % image_name,
@@ -77,7 +74,3 @@ class DockerImage(object):
     def multiple_check_and_pull(self, images):
         for image in images:
             self.check_and_pull(image)
-
-    @staticmethod
-    def check_remote(image_name):
-        return DockerHubApi.get_image_information(image_name)
