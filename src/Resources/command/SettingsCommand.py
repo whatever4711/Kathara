@@ -144,7 +144,7 @@ class SettingsCommand(Command):
                                       subtitle=current_bool("hosthome_mount"),
                                       prologue_text="""The home directory of the current user is made available for """
                                                     """reading/writing inside the device under the special """
-                                                    """directory `/hosthome`. 
+                                                    """directory `/hosthome`.
                                                     Default is %s.""" % format_bool(DEFAULTS['hosthome_mount']),
                                       formatter=menu_formatter
                                       )
@@ -172,7 +172,7 @@ class SettingsCommand(Command):
                                     prologue_text="""The shared directory inside the lab folder is made available """
                                                   """for reading/writing inside the device under the special """
                                                   """directory `/shared`.
-                                                  
+
                                                   Default is %s.""" % format_bool(DEFAULTS['shared_mount']),
                                     formatter=menu_formatter
                                     )
@@ -198,7 +198,7 @@ class SettingsCommand(Command):
                                            title=machine_shell_string,
                                            subtitle=current_string("device_shell"),
                                            formatter=menu_formatter,
-                                           prologue_text="""The shell to use inside the device. 
+                                           prologue_text="""The shell to use inside the device.
                                            **The application must be correctly installed in the Docker image used """
                                            """for the device!**
                                            Default is `%s`, but it depends on the used Docker image.
