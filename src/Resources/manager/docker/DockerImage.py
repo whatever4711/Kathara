@@ -18,13 +18,11 @@ class DockerImage(object):
         return self.client.images.get_registry_data(image_name)
 
     def pull(self, image_name):
+        # If no tag or sha key is specified, we add "latest"
+        if (':' or '@') not in image_name:
+            image_name = "%s:latest" % image_name
         print("Pulling image `%s`... This may take a while." % image_name)
-        tag = 'latest'
-        img_name = image_name
-        if ':' in image_name:
-            split_name = image_name.split(':')
-            img_name, tag = split_name[0], split_name[1]
-        return self.client.images.pull(img_name, tag=tag)
+        return self.client.images.pull(image_name)
 
     def check_update(self, image_name):
         logging.debug("Check update for %s" % image_name)
@@ -47,7 +45,8 @@ class DockerImage(object):
 
         # Format is image_name@sha256, so we strip the first part.
         (_, local_image_digest) = local_repo_digest.split("@")
-        if remote_image_digest != local_image_digest:
+        # We only need to update tagged images, not the ones with digests.
+        if (remote_image_digest != local_image_digest) and '@' not in image_name:
             utils.confirmation_prompt("A new version of image `%s` has been found on Docker Hub. "
                                       "Do you want to pull it?" % image_name,
                                       lambda: self.pull(image_name),
